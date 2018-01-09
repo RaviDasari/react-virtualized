@@ -10,6 +10,7 @@ import Table from './Table'
 import SortDirection from './SortDirection'
 import SortIndicator from './SortIndicator'
 import styles from './Table.example.css'
+import ClipboardLink from './clipboardLink'
 
 export default class TableExample extends PureComponent {
   static contextTypes = {
@@ -205,9 +206,7 @@ export default class TableExample extends PureComponent {
                   label='The description label is really long so that it will be truncated'
                   dataKey='random'
                   className={styles.exampleColumn}
-                  cellRenderer={
-                    ({ cellData, columnData, dataKey, rowData, rowIndex }) => cellData
-                  }
+                  cellRenderer={this._cellRenderer}
                   flexGrow={1}
                 />
               </Table>
@@ -215,6 +214,18 @@ export default class TableExample extends PureComponent {
           </AutoSizer>
         </div>
       </ContentBox>
+    )
+  }
+
+  _cellRenderer({ cellData, columnData, dataKey, rowData, rowIndex }) {
+    return (
+      <span>{cellData}
+        <ClipboardLink 
+          className="copy-to-clipboard"
+          data-clipboard-text={cellData}>
+          copy to clipboard
+        </ClipboardLink>
+      </span>
     )
   }
 

@@ -7,29 +7,44 @@ import ScrollSync from './ScrollSync'
 import cn from 'classnames'
 import styles from './ScrollSync.example.css'
 import scrollbarSize from 'dom-helpers/util/scrollbarSize'
+import { Resizable, ResizableBox } from 'react-resizable';
+import { SortableContainer, SortableElement, arrayMove } from 'react-sortable-hoc';
 
 const LEFT_COLOR_FROM = hexToRgb('#471061')
 const LEFT_COLOR_TO = hexToRgb('#BC3959')
-const TOP_COLOR_FROM = hexToRgb('#000000')
-const TOP_COLOR_TO = hexToRgb('#333333')
+const TOP_COLOR_FROM = hexToRgb('#d3d3d3')
+const TOP_COLOR_TO = hexToRgb('#a9a9a9')
+const MIN_WIDTH = 100
+const MAX_WIDTH = 400;
+
+const newColWidth = {};
 
 export default class GridExample extends PureComponent {
   constructor (props, context) {
     super(props, context)
 
     this.state = {
-      columnWidth: 75,
+      columnWidth: 150,
       columnCount: 50,
       height: 300,
       overscanColumnCount: 0,
       overscanRowCount: 5,
       rowHeight: 40,
-      rowCount: 100
+      rowCount: 100,
+      compKey: 1,
     }
 
     this._renderBodyCell = this._renderBodyCell.bind(this)
     this._renderHeaderCell = this._renderHeaderCell.bind(this)
     this._renderLeftSideCell = this._renderLeftSideCell.bind(this)
+    
+    this._renderLeftHeaderCell = this._renderLeftHeaderCell.bind(this)
+    this._onResizeStop = this._onResizeStop.bind(this)
+    this._onResizeStart = this._onResizeStart.bind(this)
+    this._onResize = this._onResize.bind(this)
+    this._getColumnWidth = this._getColumnWidth.bind(this)
+    this._setColumnWidth = this._setColumnWidth.bind(this)
+    this._updateGrid = this._updateGrid.bind(this)
   }
 
   render () {
@@ -44,7 +59,7 @@ export default class GridExample extends PureComponent {
     } = this.state
 
     return (
-      <ContentBox>
+      <ContentBox key={this.state.compKey}>
         <ContentBoxHeader
           text='ScrollSync'
           sourceLink='https://github.com/bvaughn/react-virtualized/blob/master/source/ScrollSync/ScrollSync.example.js'
@@ -123,15 +138,17 @@ export default class GridExample extends PureComponent {
                   <AutoSizer disableHeight>
                     {({ width }) => (
                       <div>
-                        <div style={{
-                          backgroundColor: `rgb(${topBackgroundColor.r},${topBackgroundColor.g},${topBackgroundColor.b})`,
-                          color: topColor,
-                          height: rowHeight,
-                          width: width - scrollbarSize()
-                        }}>
+                        <div 
+                          className="header-right" 
+                          style={{
+                            backgroundColor: `rgb(${topBackgroundColor.r},${topBackgroundColor.g},${topBackgroundColor.b})`,
+                            color: topColor,
+                            height: rowHeight,
+                            width: width - scrollbarSize()
+                          }}>
                           <Grid
                             className={styles.HeaderGrid}
-                            columnWidth={columnWidth}
+                            columnWidth={this._getColumnWidth}
                             columnCount={columnCount}
                             height={rowHeight}
                             overscanColumnCount={overscanColumnCount}
@@ -152,7 +169,7 @@ export default class GridExample extends PureComponent {
                         >
                           <Grid
                             className={styles.BodyGrid}
-                            columnWidth={columnWidth}
+                            columnWidth={this._getColumnWidth}
                             columnCount={columnCount}
                             height={height}
                             onScroll={onScroll}
@@ -193,15 +210,64 @@ export default class GridExample extends PureComponent {
   }
 
   _renderLeftHeaderCell ({ columnIndex, key, rowIndex, style }) {
+    let newStyles = style;
+    if (newColWidth['' + columnIndex]) {
+      newStyles = {...style, width: newColWidth[columnIndex]}
+    }
     return (
       <div
+          className={cn(styles.headerCell, 'ravi-header-cell')}
+          key={key}
+          style={newStyles}>
+        <ResizableBox 
+          data-column-index={columnIndex}
+          axis="x"
+          width={newStyles.width} height={style.height}
+          minConstraints={[100, 10]} maxConstraints={[300, 300]}
+          onResizeStop={this._onResizeStop}
+          onResize={this._onResize}
+          >
+          <span>{`C${columnIndex}`}</span>
+        </ResizableBox>
+      </div>
+    )
+
+    /*  <div
         className={styles.headerCell}
         key={key}
         style={style}
       >
         {`C${columnIndex}`}
-      </div>
-    )
+      </div>*/
+    
+  }
+  _onResizeStop (e, data) {
+    //console.log(e);
+    this._updateGrid(e, data)
+  }
+
+  _onResizeStart (e, data) {
+    console.log(data);
+  }
+
+  _updateGrid(e, data, onResize) {
+    let index = parseInt(data.node.offsetParent.attributes["data-column-index"].value);
+    let newWidth = parseInt(data.size.width)
+    let oldWidth = this._getColumnWidth({index})
+
+    let width =  newWidth 
+
+    //onResize update only after 10 px width change
+    //if (!onResize && Math.abs(newColWidth - oldWidth) > 10) {
+      this._setColumnWidth({index, width})
+      this.setState({compKey: this.state.compKey + 1}) //force update
+      this.forceUpdate()
+    //}
+  }
+
+  _onResize (e, data) {
+    //console.log(data);
+    //_updateGrid(e, data, true);
   }
 
   _renderLeftSideCell ({ columnIndex, key, rowIndex, style }) {
@@ -210,16 +276,37 @@ export default class GridExample extends PureComponent {
       : columnIndex % 2 !== 0 ? styles.evenRow : styles.oddRow
     const classNames = cn(rowClass, styles.cell)
 
+    let newStyles = style;
+    if (newColWidth['' + columnIndex]) {
+      newStyles = {...style, width: newColWidth[columnIndex]}
+    }
+
     return (
       <div
         className={classNames}
         key={key}
-        style={style}
+        style={newStyles}
       >
         {`R${rowIndex}, C${columnIndex}`}
       </div>
     )
   }
+
+  _setColumnWidth({index, width}) {
+     if(width < MIN_WIDTH || width > MAX_WIDTH) {
+      return 
+     }
+     newColWidth['' + index] = width;
+  }
+
+  _getColumnWidth ({index}) {
+    if (newColWidth['' + index]){
+      return newColWidth['' + index]
+    }
+    return this.state.columnWidth
+  }
+
+
 }
 
 function hexToRgb (hex) {

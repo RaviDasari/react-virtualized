@@ -37,7 +37,7 @@ export default class DynamicHeightTableColumn extends PureComponent {
         rowClassName={styles.tableRow}
         rowHeight={this._cache.rowHeight}
         rowGetter={this._rowGetter}
-        rowCount={1000}
+        rowCount={200000}
         width={width}
       >
         <Column
