@@ -65,4 +65,39 @@
   box-sizing: border-box;
   cursor: se-resize;
 }
+
+.noselect {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
 /*copied from https://github.com/STRML/react-resizable */
+
+/* custom css */
+.col-drag-handle {
+  cursor: e-resize;
+}
+
+.div-align-center{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  border: 1px solid black;
+}
+
+.sort-helper-class {
+  background-color: blue;
+  color: white;
+  border: 1px solid black;
+
+}
+
+.now-resizing {
+      z-index: 1;
+    background-color: white;
+    color: black;
+}

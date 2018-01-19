@@ -8,7 +8,11 @@ import cn from 'classnames'
 import styles from './ScrollSync.example.css'
 import scrollbarSize from 'dom-helpers/util/scrollbarSize'
 import { Resizable, ResizableBox } from 'react-resizable';
-import { SortableContainer, SortableElement, arrayMove } from 'react-sortable-hoc';
+import { SortableContainer, SortableElement, arrayMove, SortableHandle } from 'react-sortable-hoc';
+import _ from 'lodash';
+import { CellMeasurer, CellMeasurerCache } from '../CellMeasurer'
+import { fastLoremIpsum } from 'fast-lorem-ipsum'
+import $ from 'jquery'
 
 const LEFT_COLOR_FROM = hexToRgb('#471061')
 const LEFT_COLOR_TO = hexToRgb('#BC3959')
@@ -19,6 +23,14 @@ const MAX_WIDTH = 400;
 
 const newColWidth = {};
 
+const columnNames = _.times(50, (i) => {
+  let count = Math.floor(Math.random()*30) + 1;
+  return {
+    name:fastLoremIpsum(`${count}w`),
+    index: i 
+  };
+})
+
 export default class GridExample extends PureComponent {
   constructor (props, context) {
     super(props, context)
@@ -26,6 +38,7 @@ export default class GridExample extends PureComponent {
     this.state = {
       columnWidth: 150,
       columnCount: 50,
+      columnNames,
       height: 300,
       overscanColumnCount: 0,
       overscanRowCount: 5,
@@ -45,6 +58,33 @@ export default class GridExample extends PureComponent {
     this._getColumnWidth = this._getColumnWidth.bind(this)
     this._setColumnWidth = this._setColumnWidth.bind(this)
     this._updateGrid = this._updateGrid.bind(this)
+    this._onSortEnd = this._onSortEnd.bind(this)
+    this._forceUpdateGrid = this._forceUpdateGrid.bind(this)
+    this._renderLeftHeaderCell2 = this._renderLeftHeaderCell2.bind(this)
+    this._getRowHeight = this._getRowHeight.bind(this)
+    this._setBodyGridRef = this._setBodyGridRef.bind(this)
+    this._setHeaderGridRef = this._setHeaderGridRef.bind(this)
+
+    this._cache = new CellMeasurerCache({
+      defaultWidth: 150,
+      fixedWidth: true,
+      //defaultHeight: 40,
+    })
+    window._table = this;
+    window._cache = this._cache
+  }
+
+  _setBodyGridRef(ref) {
+    window._bodyGridRef = this._bodyGridRef = ref;
+  }
+  _setHeaderGridRef(ref) {
+   window._headerGridRef = this._headerGridRef = ref; 
+  }
+
+  _getRowHeight() {
+    let rowHeight = this._cache._rowHeightCache && this._cache._rowHeightCache["0-0"] || this.state.rowHeight
+    //console.log(`rowHeight - ${rowHeight}`)
+    return rowHeight
   }
 
   render () {
@@ -76,7 +116,7 @@ export default class GridExample extends PureComponent {
         </ContentBoxParagraph>
 
         <ScrollSync>
-          {({ clientHeight, clientWidth, onScroll, scrollHeight, scrollLeft, scrollTop, scrollWidth }) => {
+          {({ clientHeight, clientWidth, onScroll, scrollVersion, scrollHeight, scrollLeft, scrollTop, scrollWidth, updateScrollVersion }) => {
             const x = scrollLeft / (scrollWidth - clientWidth)
             const y = scrollTop / (scrollHeight - clientHeight)
 
@@ -86,6 +126,7 @@ export default class GridExample extends PureComponent {
             const topColor = '#ffffff'
             const middleBackgroundColor = mixColors(leftBackgroundColor, topBackgroundColor, 0.5)
             const middleColor = '#ffffff'
+            this.updateScrollVersion = updateScrollVersion;
 
             return (
               <div className={styles.GridRow}>
@@ -100,11 +141,11 @@ export default class GridExample extends PureComponent {
                   }}
                 >
                   <Grid
-                    cellRenderer={this._renderLeftHeaderCell}
+                    cellRenderer={this._renderLeftHeaderCell2}
                     className={styles.HeaderGrid}
                     width={columnWidth}
-                    height={rowHeight}
-                    rowHeight={rowHeight}
+                    height={this._getRowHeight()}
+                    rowHeight={this._getRowHeight()}
                     columnWidth={columnWidth}
                     rowCount={1}
                     columnCount={1}
@@ -115,7 +156,7 @@ export default class GridExample extends PureComponent {
                   style={{
                     position: 'absolute',
                     left: 0,
-                    top: rowHeight,
+                    top: this._getRowHeight(),
                     color: leftColor,
                     backgroundColor: `rgb(${leftBackgroundColor.r},${leftBackgroundColor.g},${leftBackgroundColor.b})`
                   }}
@@ -143,21 +184,27 @@ export default class GridExample extends PureComponent {
                           style={{
                             backgroundColor: `rgb(${topBackgroundColor.r},${topBackgroundColor.g},${topBackgroundColor.b})`,
                             color: topColor,
-                            height: rowHeight,
+                            height: this._getRowHeight(),
                             width: width - scrollbarSize()
                           }}>
-                          <Grid
-                            className={styles.HeaderGrid}
-                            columnWidth={this._getColumnWidth}
-                            columnCount={columnCount}
-                            height={rowHeight}
-                            overscanColumnCount={overscanColumnCount}
-                            cellRenderer={this._renderHeaderCell}
-                            rowHeight={rowHeight}
-                            rowCount={1}
-                            scrollLeft={scrollLeft}
-                            width={width - scrollbarSize()}
-                          />
+                            <SortableGrid
+                              onRefChange={this._setHeaderGridRef}
+                              className={cn(styles.HeaderGrid, 'noselect')}
+                              columnWidth={this._getColumnWidth}
+
+                              helperClass="sort-helper-class"
+                              columnCount={columnCount}
+                              height={this._getRowHeight()}
+                              overscanColumnCount={overscanColumnCount}
+                              cellRenderer={this._renderHeaderCell}
+                              rowCount={1}
+                              scrollLeft={scrollLeft}
+                              width={width - scrollbarSize()}
+                              axis="x" lockAxis="x" onSortEnd={this._onSortEnd} useDragHandle={true} 
+
+                              deferredMeasurementCache={this._cache}
+                              rowHeight={this._cache.rowHeight}
+                            />
                         </div>
                         <div
                           style={{
@@ -168,11 +215,13 @@ export default class GridExample extends PureComponent {
                           }}
                         >
                           <Grid
+                            ref={this._setBodyGridRef}
                             className={styles.BodyGrid}
                             columnWidth={this._getColumnWidth}
                             columnCount={columnCount}
                             height={height}
                             onScroll={onScroll}
+                            scrollLeft={scrollLeft}
                             overscanColumnCount={overscanColumnCount}
                             overscanRowCount={overscanRowCount}
                             cellRenderer={this._renderBodyCell}
@@ -193,6 +242,10 @@ export default class GridExample extends PureComponent {
     )
   }
 
+  componentDidMount() {
+    this._forceUpdateGrid()
+  }
+
   _renderBodyCell ({ columnIndex, key, rowIndex, style }) {
     if (columnIndex < 1) {
       return
@@ -201,68 +254,87 @@ export default class GridExample extends PureComponent {
     return this._renderLeftSideCell({ columnIndex, key, rowIndex, style })
   }
 
-  _renderHeaderCell ({ columnIndex, key, rowIndex, style }) {
+  _renderHeaderCell ({ columnIndex, key, rowIndex, style, parent }) {
     if (columnIndex < 1) {
       return
     }
 
-    return this._renderLeftHeaderCell({ columnIndex, key, rowIndex, style })
+    return this._renderLeftHeaderCell({ columnIndex, key, rowIndex, style, parent })
   }
 
-  _renderLeftHeaderCell ({ columnIndex, key, rowIndex, style }) {
-    let newStyles = style;
-    if (newColWidth['' + columnIndex]) {
-      newStyles = {...style, width: newColWidth[columnIndex]}
-    }
+  _renderLeftHeaderCell ({ columnIndex, key, rowIndex, style, parent }) {
     return (
-      <div
-          className={cn(styles.headerCell, 'ravi-header-cell')}
+        <SortableHeader
+          columnIndex={columnIndex}
           key={key}
-          style={newStyles}>
-        <ResizableBox 
-          data-column-index={columnIndex}
-          axis="x"
-          width={newStyles.width} height={style.height}
-          minConstraints={[100, 10]} maxConstraints={[300, 300]}
+          index={columnIndex}
+          rowIndex={rowIndex}
+          style={style}
           onResizeStop={this._onResizeStop}
+          onResizeStart={this._onResizeStart}
           onResize={this._onResize}
-          >
-          <span>{`C${columnIndex}`}</span>
-        </ResizableBox>
-      </div>
-    )
+          columnName={this.state.columnNames[columnIndex].name}
+          columnNames={this.state.columnNames}
+          parent={parent}
+          cache={this._cache}
+        />
+      )
+  }
 
-    /*  <div
-        className={styles.headerCell}
-        key={key}
-        style={style}
-      >
-        {`C${columnIndex}`}
-      </div>*/
-    
+  _renderLeftHeaderCell2 ({ columnIndex, key, rowIndex, style, parent }) {
+    return <div className="div-align-center">{`C${columnIndex}`}</div>
   }
   _onResizeStop (e, data) {
     //console.log(e);
-    this._updateGrid(e, data)
+    let colIndex = parseInt(data.node.offsetParent.attributes["data-column-index"].value);
+
+    if (colIndex >= 0) {
+    //invalidate _cache for this column
+    //  delete this._cache._cellHeightCache[`0-${colIndex}`]
+    }
+
+    this._updateGrid(e, data, false)
+    //this._forceUpdateGrid() //TODO
   }
 
   _onResizeStart (e, data) {
-    console.log(data);
+
+    //console.log(data);
   }
 
-  _updateGrid(e, data, onResize) {
+  _updateGrid(e, data, forceUpdate = true) {
     let index = parseInt(data.node.offsetParent.attributes["data-column-index"].value);
     let newWidth = parseInt(data.size.width)
     let oldWidth = this._getColumnWidth({index})
-
     let width =  newWidth 
+    let columnNodeStyle = undefined
+    try {
+      columnNodeStyle = data.node.parentNode.parentNode.style
+    }catch(e){}
 
     //onResize update only after 10 px width change
     //if (!onResize && Math.abs(newColWidth - oldWidth) > 10) {
       this._setColumnWidth({index, width})
+      forceUpdate && this._forceUpdateGrid()
+
+      _.delay(() => {this._bodyGridRef.recomputeGridSize(index,0)}, 200)
+      _.delay(() => {
+        //hack fix, had to be a better way to do this, but couldn't find. Talk to Josh if we can solve this by just css (which i tried).
+        if (columnNodeStyle)
+          columnNodeStyle.height = "";
+        //$(data.node).parent().attr("style", $(data.node).parent().attr("style").replace("height: auto;"));
+      }, 100)
+
+      window.data = {}
+      window.data.node = data.node;
+    //}
+  }
+
+  _forceUpdateGrid() {
+    _.delay(()=> {
       this.setState({compKey: this.state.compKey + 1}) //force update
       this.forceUpdate()
-    //}
+    }, 200)
   }
 
   _onResize (e, data) {
@@ -277,8 +349,8 @@ export default class GridExample extends PureComponent {
     const classNames = cn(rowClass, styles.cell)
 
     let newStyles = style;
-    if (newColWidth['' + columnIndex]) {
-      newStyles = {...style, width: newColWidth[columnIndex]}
+    if (this.state.columnNames[columnIndex] && this.state.columnNames[columnIndex].width) {
+      newStyles = {...style, width: this.state.columnNames[columnIndex].width}
     }
 
     return (
@@ -296,14 +368,37 @@ export default class GridExample extends PureComponent {
      if(width < MIN_WIDTH || width > MAX_WIDTH) {
       return 
      }
-     newColWidth['' + index] = width;
+     this.setState({
+        columnNames: [
+          ...this.state.columnNames.slice(0, index),
+          {...this.state.columnNames[index], width},
+          ...this.state.columnNames.slice(index + 1)
+        ]
+     })
+//     newColWidth['' + index] = width;
   }
 
   _getColumnWidth ({index}) {
-    if (newColWidth['' + index]){
-      return newColWidth['' + index]
+    if (this.state.columnNames[index] && this.state.columnNames[index].width){
+      return this.state.columnNames[index].width
     }
     return this.state.columnWidth
+  }
+
+  _onSortEnd({oldIndex, newIndex}) {
+      let scrollLeft = _.get(this._headerGridRef, '_scrollingContainer.scrollLeft')
+      this.setState(state => ({
+        columnNames: arrayMove(state.columnNames, oldIndex, newIndex),
+      }), () => {
+        this._headerGridRef.recomputeGridSize(0,0)
+        _.delay(() => {
+          this._bodyGridRef.recomputeGridSize(0,0)}, 200)
+          //update scroll version to force sync the scroll in column grid and child grid
+          if (_.isFunction(this.updateScrollVersion))
+            this.updateScrollVersion(scrollLeft);
+      });
+
+      //this._forceUpdateGrid()
   }
 
 
@@ -332,3 +427,60 @@ function mixColors (color1, color2, amount) {
 
   return { r, g, b }
 }
+
+
+const SortableHeader = SortableElement(({ columnName, columnNames, columnIndex, key, rowIndex, style, onResizeStart, onResizeStop, onResize, cache, parent}) => {
+    let newStyles = style;
+    if (columnNames[columnIndex].width) {
+      newStyles = {...style, width: columnNames[columnIndex].width}
+    }
+
+    const _onResizeStop = (measure) => (e, data) => {
+        onResizeStop(e, data);
+        measure()
+    }
+    return (
+      <CellMeasurer
+            cache={cache}
+            columnIndex={columnIndex}
+            key={key}
+            parent={parent}
+            rowIndex={rowIndex}>
+            {({measure}) => (
+              <div
+                  className={cn(styles.headerCell, 'ravi-header-cell')}
+                  key={key}
+                  style={newStyles}>
+                  
+                    <ResizableBox 
+                      data-column-index={columnIndex}
+                      axis="x"
+                      draggableOpts={{defaultClassNameDragging: 'col-react-draggable-dragging'}}
+                      width={newStyles.width == 'auto' ? 150 : newStyles.width} height="auto"
+                      minConstraints={[100, 10]} maxConstraints={[300, 300]}
+                      onResizeStart={onResizeStart}
+                      onResizeStop={_onResizeStop(measure)}
+                      onResize={onResize}>
+                      <span>
+                       <DragHandle /> {`C${columnNames[columnIndex].index} - ${columnName}`}
+                      </span>
+                    </ResizableBox>
+              </div>
+          )
+      }
+      </CellMeasurer>
+    )
+  })
+
+//const SortableGrid = SortableContainer(Grid)
+
+const SortableGrid = SortableContainer((props) => {
+  return (
+    <Grid
+      ref={props.onRefChange}
+      {...props} />
+  )
+})
+
+
+const DragHandle = SortableHandle(() => <span className="col-drag-handle">::</span>)

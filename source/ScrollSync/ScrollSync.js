@@ -23,25 +23,33 @@ export default class ScrollSync extends PureComponent {
       scrollHeight: 0,
       scrollLeft: 0,
       scrollTop: 0,
-      scrollWidth: 0
+      scrollWidth: 0,
+      scrollVersion: 0,
     }
 
     this._onScroll = this._onScroll.bind(this)
+    this._updateScrollVersion = this._updateScrollVersion.bind(this)
   }
 
   render () {
     const { children } = this.props
-    const { clientHeight, clientWidth, scrollHeight, scrollLeft, scrollTop, scrollWidth } = this.state
-
+    const { clientHeight, clientWidth, scrollHeight, scrollLeft, scrollTop, scrollWidth, scrollVersion } = this.state
+    //console.log(`scrollLeft: ${scrollLeft}`)
     return children({
       clientHeight,
       clientWidth,
       onScroll: this._onScroll,
+      updateScrollVersion: this._updateScrollVersion,
       scrollHeight,
       scrollLeft,
       scrollTop,
-      scrollWidth
+      scrollWidth,
+      scrollVersion,
     })
+  }
+
+  _updateScrollVersion(scrollLeft){
+    this.setState({scrollVersion: this.state.scrollVersion + 1, scrollLeft})
   }
 
   _onScroll ({ clientHeight, clientWidth, scrollHeight, scrollLeft, scrollTop, scrollWidth }) {
