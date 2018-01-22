@@ -23,6 +23,7 @@ import ListExample from '../List/List.example'
 import MasonryExample from '../Masonry/Masonry.example'
 import MultiGridExample from '../MultiGrid/MultiGrid.example'
 import ScrollSyncExample from '../ScrollSync/ScrollSync.example'
+import MasterDataTableExample from '../CustomGrid/MasterDataTable.example'
 import TableExample from '../Table/Table.example'
 import WindowScrollerExample from '../WindowScroller/WindowScroller.example'
 
@@ -38,6 +39,7 @@ const COMPONENT_EXAMPLES_MAP = {
   '/components/List': ListExample,
   '/components/MultiGrid': MultiGridExample,
   '/components/ScrollSync': ScrollSyncExample,
+  '/components/CustomGrid': MasterDataTableExample,
   '/components/Table': TableExample,
   '/components/WindowScroller': WindowScrollerExample
 }
@@ -116,6 +118,7 @@ export default class Application extends PureComponent {
             </div>
 
             <div className={styles.HighOrderComponentList}>
+              <ComponentLink to='/components/CustomGrid'>MasterDataTable</ComponentLink>
               <ComponentLink to='/components/ArrowKeyStepper'>ArrowKeyStepper</ComponentLink>
               <ComponentLink to='/components/AutoSizer'>AutoSizer</ComponentLink>
               <ComponentLink to='/components/CellMeasurer'>CellMeasurer</ComponentLink>
